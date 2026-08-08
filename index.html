@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Hệ Thống Quản Lý CCCD Realtime & In Tem</title>
+    <!-- Thư viện xuất Excel -->
+    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+    <!-- Thư viện Firebase v10 (Modular SDK) -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getDatabase, ref, push, set, onValue, remove } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+        // === THAY THẾ CONFIG FIREBASE CỦA BẠN VÀO ĐÂY ===
+        const firebaseConfig = {
+            apiKey: "AIzaSyDmzHTFW5LVuO1fFAX44eJAuI1fwSrV2Yg",
+            authDomain: "ksk-crud.firebaseapp.com",
+            databaseURL: "https://ksk-crud-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "ksk-crud",
+            storageBucket: "ksk-crud.firebasestorage.app",
+            messagingSenderId: "598973564084",
+            appId: "1:598973564084:web:fbca8dda4e7ead360503e1"
+};
+
+        // Khởi tạo Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+        const dbRef = ref(db, 'cccd_records');
+
+        let currentCounter = 1;
+
+        // 1. Lắng nghe dữ liệu thay đổi Realtime từ Firebase
+        onValue(dbRef, (snapshot) => {
+            const data = snapshot.val();
+            const tableBody = document.getElementById('tableBody');
+            tableBody.innerHTML = '';
+            
+            if (data) {
+                let records = Object.entries(data);
+                currentCounter = records.length + 1; // Tự động tăng STT dựa trên số lượng bản ghi thực tế
+
+                records.forEach(([key, item], index) => {
+                    let sttFormatted = String(index + 1).padStart(4, '0');
+                    let row = `<tr>
+                        <td style="text-align: center;"><input type="checkbox" class="row-checkbox" data-stt="${sttFormatted}" data-name="${item.name}" data-year="${item.year}" data-gender="${item.gender}"></td>
+                        <td style="text-align: center; font-weight: bold;">${sttFormatted}</td>
+                        <td style="text-align: center;">${item.cccd}</td>
+                        <td>${item.name}</td>
+                        <td style="text-align: center;">${item.year}</td>
+                        <td style="text-align: center;">${item.gender}</td>
+                        <td>${item.address}</td>
+                        <td style="text-align: center;">
+                            <button class="btn-print" onclick="printSingleSTT('${sttFormatted}', '${item.name}', '${item.year}', '${item.gender}')">In Tem</button>
+                        </td>
+                    </tr>`;
+                    tableBody.insertAdjacentHTML('beforeend', row);
+                });
+            } else {
+                currentCounter = 1;
+            }
+        });
+
+        // 2. Xử lý khi quét mã QR CCCD và đẩy lên Firebase
+        const cccdInput = document.getElementById('cccdInput');
+        cccdInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                let rawData = this.value.trim();
+                let data = rawData.split('|');
+
+                if (data.length >= 6) {
+                    let cccd = data[0];
+                    let name = data[2];
+                    let dobRaw = data[3];
+                    let yearOfBirth = dobRaw.length === 8 ? dobRaw.substring(4, 8) : dobRaw;
+                    let gender = data[4];
+                    let address = data[5];
+
+                    // Đẩy dữ liệu mới lên Firebase Database (Tất cả các máy khác sẽ nhận được ngay lập tức)
+                    push(dbRef, {
+                        cccd: cccd,
+                        name: name,
+                        year: yearOfBirth,
+                        gender: gender,
+                        address: address,
+                        timestamp: Date.now()
+                    });
+
+                } else {
+                    alert("Dữ liệu quét không phải mã QR CCCD hợp lệ!");
+                }
+                this.value = '';
+            }
+        });
+    </script>
+
+    <style>
+        @page { size: 5cm 3cm; margin: 0; }
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f4f6f9; }
+        .container { max-width: 1000px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .section-box { border: 1px solid #ddd; padding: 15px; margin-bottom: 20px; border-radius: 6px; background: #fff; }
+        .scanner-section { background: #e8f4fd; border: 2px dashed #007bff; }
+        input[type="text"] { width: 100%; padding: 8px; margin: 5px 0; box-sizing: border-box; }
+        button { padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; color: white; font-weight: bold; }
+        .btn-excel { background: #17a2b8; }
+        .btn-print { background: #28a745; padding: 5px 10px; font-size: 12px; }
+        .btn-print-batch { background: #ffc107; color: black; margin-bottom: 10px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background: #f2f2f2; text-align: center; }
+        
+        /* CSS In Tem STT khổ 5cm x 3cm */
+        .number-container { 
+            width: 5cm; 
+            height: 3cm; 
+            display: flex; 
+            flex-direction: column; 
+            justify-content: center; 
+            align-items: center; 
+            page-break-after: always; 
+            box-sizing: border-box; 
+            padding: 4px;
+            text-align: center;
+        }
+        .number-text { font-size: 55px; font-weight: bold; line-height: 1; }
+        .name-text { font-size: 16px; font-weight: bold; margin-top: 4px; max-width: 4.8cm; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+        .info-text { font-size: 14px; margin-top: 2px; }
+
+        #print-area { display: none; }
+        @media print {
+            body * { visibility: hidden; }
+            #print-area, #print-area * { visibility: visible; }
+            #print-area { display: block; position: absolute; left: 0; top: 0; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Hệ Thống Quản Lý CCCD Realtime & In Tem</h2>
+
+    <!-- 1. Quét CCCD -->
+    <div class="section-box scanner-section">
+        <label style="color: #0056b3; font-weight: bold;">📥 Đặt chuột vào ô này và quét mã QR CCCD:</label>
+        <input type="text" id="cccdInput" placeholder="Quét mã QR CCCD..." autofocus autocomplete="off">
+    </div>
+
+    <!-- 2. Lưới dữ liệu & Thao tác -->
+    <div class="section-box">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <div>
+                <button class="btn-print-batch" onclick="printSelected()">🖨️ In Các Dòng Đã Chọn</button>
+                <button class="btn-excel" onclick="exportExcel()">📥 Xuất File Excel</button>
+            </div>
+            <div>
+                <label><input type="checkbox" id="selectAll" onclick="toggleSelectAll(this)"> Chọn tất cả</label>
+            </div>
+        </div>
+        
+        <table id="dataTable">
+            <thead>
+                <tr>
+                    <th width="40px">Chọn</th>
+                    <th>STT</th>
+                    <th>Số CCCD</th>
+                    <th>Họ và Tên</th>
+                    <th>Năm Sinh</th>
+                    <th>Giới Tính</th>
+                    <th>Địa Chỉ</th>
+                    <th>Thao Tác</th>
+                </tr>
+            </thead>
+            <tbody id="tableBody">
+                <!-- Dữ liệu đồng bộ Realtime sẽ hiển thị ở đây -->
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Vùng ẩn chứa nội dung chuẩn bị in tem -->
+<div id="print-area"></div>
+
+<script>
+    // Chọn tất cả checkbox
+    function toggleSelectAll(source) {
+        let checkboxes = document.querySelectorAll('.row-checkbox');
+        checkboxes.forEach(cb => cb.checked = source.checked);
+    }
+
+    // In 1 tem đơn lẻ
+    function printSingleSTT(sttStr, name, year, gender) {
+        const container = document.getElementById('print-area');
+        container.innerHTML = `
+            <div class="number-container">
+                <span class="number-text">${sttStr}</span>
+                <span class="name-text">${name}</span>
+                <span class="info-text">NS: ${year} | GT: ${gender}</span>
+            </div>
+        `;
+        window.print();
+    }
+
+    // In hàng loạt các dòng đã tích chọn checkbox
+    function printSelected() {
+        const selectedCheckboxes = document.querySelectorAll('.row-checkbox:checked');
+        if (selectedCheckboxes.length === 0) {
+            alert("Vui lòng tích chọn ít nhất một dòng để in!");
+            return;
+        }
+
+        const container = document.getElementById('print-area');
+        let htmlContent = '';
+
+        selectedCheckboxes.forEach(cb => {
+            let stt = cb.getAttribute('data-stt');
+            let name = cb.getAttribute('data-name');
+            let year = cb.getAttribute('data-year');
+            let gender = cb.getAttribute('data-gender');
+
+            htmlContent += `
+                <div class="number-container">
+                    <span class="number-text">${stt}</span>
+                    <span class="name-text">${name}</span>
+                    <span class="info-text">NS: ${year} | GT: ${gender}</span>
+                </div>
+            `;
+        });
+
+        container.innerHTML = htmlContent;
+        window.print();
+    }
+
+    // Xuất toàn bộ lưới ra Excel
+    function exportExcel() {
+        var table = document.getElementById("dataTable");
+        if (table.rows.length <= 1) {
+            alert("Chưa có dữ liệu để xuất Excel!");
+            return;
+        }
+        let cloneTable = table.cloneNode(true);
+        for (let row of cloneTable.rows) {
+            row.deleteCell(7); // Xóa cột Thao tác
+            row.deleteCell(0); // Xóa cột Checkbox
+        }
+        var wb = XLSX.utils.table_to_book(cloneTable, {sheet: "DanhSachCCCD"});
+        XLSX.writeFile(wb, 'Danh_Sach_CCCD_Realtime.xlsx');
+    }
+</script>
+
+</body>
+</html>
