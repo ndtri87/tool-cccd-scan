@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <title>TMMC Healthcare</title>
+    <title>Hệ Thống Quản Lý CCCD Realtime & In Tem</title>
     <!-- Thư viện xuất Excel -->
     <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
     <!-- Thư viện Firebase v10 (Modular SDK) -->
@@ -10,13 +10,13 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getDatabase, ref, push, set, onValue, remove } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
-        // === CONFIG FIREBASE ===
+        // === THAY THẾ CONFIG FIREBASE CỦA BẠN VÀO ĐÂY ===
         const firebaseConfig = {
             apiKey: "AIzaSyDmzHTFW5LVuO1fFAX44eJAuI1fwSrV2Yg",
             authDomain: "ksk-crud.firebaseapp.com",
             databaseURL: "https://ksk-crud-default-rtdb.asia-southeast1.firebasedatabase.app",
             projectId: "ksk-crud",
-            storageBucket: "ksk-crud.firebasestorage.app",
+            storageBucket: "ksk-crud.appspot.com",
             messagingSenderId: "598973564084",
             appId: "1:598973564084:web:fbca8dda4e7ead360503e1"
         };
@@ -26,8 +26,6 @@
         const db = getDatabase(app);
         const dbRef = ref(db, 'cccd_records');
 
-        let currentCounter = 1;
-
         // 1. Lắng nghe dữ liệu thay đổi Realtime từ Firebase
         onValue(dbRef, (snapshot) => {
             const data = snapshot.val();
@@ -36,10 +34,13 @@
             
             if (data) {
                 let records = Object.entries(data);
-                currentCounter = records.length + 1;
+                // Lấy số bắt đầu do người dùng nhập trên giao diện (mặc định là 1 nếu trống)
+                let startNum = parseInt(document.getElementById('startNum').value) || 1;
 
                 records.forEach(([key, item], index) => {
-                    let sttFormatted = String(index + 1).padStart(4, '0');
+                    let currentNum = startNum + index;
+                    let sttFormatted = String(currentNum).padStart(4, '0'); // Định dạng 4 chữ số
+
                     let row = `<tr>
                         <td style="text-align: center;"><input type="checkbox" class="row-checkbox" data-stt="${sttFormatted}" data-name="${item.name}" data-dob="${item.dob}" data-gender="${item.gender}"></td>
                         <td style="text-align: center; font-weight: bold;">${sttFormatted}</td>
@@ -54,8 +55,6 @@
                     </tr>`;
                     tableBody.insertAdjacentHTML('beforeend', row);
                 });
-            } else {
-                currentCounter = 1;
             }
         });
 
@@ -70,9 +69,8 @@
                 if (data.length >= 6) {
                     let cccd = data[0];
                     let name = data[2];
-                    let dobRaw = data[3]; // Định dạng gốc trên CCCD: DDMMYYYY (ví dụ: 15081995)
+                    let dobRaw = data[3]; // Định dạng gốc trên CCCD: DDMMYYYY
                     
-                    // Chuyển đổi DDMMYYYY thành DD/MM/YYYY
                     let dobFormatted = dobRaw;
                     if (dobRaw.length === 8) {
                         dobFormatted = `${dobRaw.substring(0, 2)}/${dobRaw.substring(2, 4)}/${dobRaw.substring(4, 8)}`;
@@ -104,7 +102,7 @@
         .container { max-width: 1000px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
         .section-box { border: 1px solid #ddd; padding: 15px; margin-bottom: 20px; border-radius: 6px; background: #fff; }
         .scanner-section { background: #e8f4fd; border: 2px dashed #007bff; }
-        input[type="text"] { width: 100%; padding: 8px; margin: 5px 0; box-sizing: border-box; }
+        input[type="text"], input[type="number"] { width: 100%; padding: 8px; margin: 5px 0; box-sizing: border-box; }
         button { padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; color: white; font-weight: bold; }
         .btn-excel { background: #17a2b8; }
         .btn-print { background: #28a745; padding: 5px 10px; font-size: 12px; }
@@ -141,11 +139,21 @@
 <body>
 
 <div class="container">
-    <h2>BỆNH VIỆN ĐA KHOA TÂM TRÍ SÀI GÒN</h2>
+    <h2>Hệ Thống Quản Lý CCCD Realtime & In Tem</h2>
+
+    <!-- Cài đặt số STT bắt đầu -->
+    <div class="section-box" style="background: #fff3cd; border-color: #ffeeba;">
+        <label style="font-weight: bold; color: #856404;">⚙️ Cấu hình số thứ tự phát sinh:</label>
+        <div style="display: flex; align-items: center; gap: 10px; margin-top: 5px;">
+            <span>STT Bắt Đầu:</span>
+            <input type="number" id="startNum" value="1" min="1" onchange="location.reload()" style="width: 120px; font-weight: bold; text-align: center;">
+            <span style="font-size: 13px; color: #666;">(Thay đổi số này để đổi mốc STT bắt đầu)</span>
+        </div>
+    </div>
 
     <!-- 1. Quét CCCD -->
     <div class="section-box scanner-section">
-        <label style="color: #0056b3; font-weight: bold;">📥 Đặt chuột vào ô này và quét mã QR CCCD => Enter để xác nhận dữ liệu:</label>
+        <label style="color: #0056b3; font-weight: bold;">📥 Đặt chuột vào ô này và quét mã QR CCCD:</label>
         <input type="text" id="cccdInput" placeholder="Quét mã QR CCCD..." autofocus autocomplete="off">
     </div>
 
@@ -191,7 +199,7 @@
         checkboxes.forEach(cb => cb.checked = source.checked);
     }
 
-    // In 1 tem đơn lẻ (Hiển thị đầy đủ Ngày sinh & Giới tính)
+    // In 1 tem đơn lẻ
     function printSingleSTT(sttStr, name, dob, gender) {
         const container = document.getElementById('print-area');
         container.innerHTML = `
@@ -234,7 +242,7 @@
         window.print();
     }
 
-    // Xuất toàn bộ lưới ra Excel (Ép cột Số CCCD thành kiểu chuỗi Text chống mất số 0)
+    // Xuất toàn bộ lưới ra Excel (Ép cột Số CCCD thành kiểu chuỗi Text)[cite: 1]
     function exportExcel() {
         var table = document.getElementById("dataTable");
         if (table.rows.length <= 1) {
