@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <title>Hệ Thống Quản Lý CCCD Realtime & In Tem</title>
+    <title>TMMC Healthcare</title>
     <!-- Thư viện xuất Excel -->
     <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
     <!-- Thư viện Firebase v10 (Modular SDK) -->
@@ -10,7 +10,7 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getDatabase, ref, push, set, onValue, remove } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
-        // === THAY THẾ CONFIG FIREBASE CỦA BẠN VÀO ĐÂY ===
+        // === CONFIG FIREBASE ===
         const firebaseConfig = {
             apiKey: "AIzaSyDmzHTFW5LVuO1fFAX44eJAuI1fwSrV2Yg",
             authDomain: "ksk-crud.firebaseapp.com",
@@ -19,7 +19,7 @@
             storageBucket: "ksk-crud.firebasestorage.app",
             messagingSenderId: "598973564084",
             appId: "1:598973564084:web:fbca8dda4e7ead360503e1"
-};
+        };
 
         // Khởi tạo Firebase
         const app = initializeApp(firebaseConfig);
@@ -36,20 +36,20 @@
             
             if (data) {
                 let records = Object.entries(data);
-                currentCounter = records.length + 1; // Tự động tăng STT dựa trên số lượng bản ghi thực tế
+                currentCounter = records.length + 1;
 
                 records.forEach(([key, item], index) => {
                     let sttFormatted = String(index + 1).padStart(4, '0');
                     let row = `<tr>
-                        <td style="text-align: center;"><input type="checkbox" class="row-checkbox" data-stt="${sttFormatted}" data-name="${item.name}" data-year="${item.year}" data-gender="${item.gender}"></td>
+                        <td style="text-align: center;"><input type="checkbox" class="row-checkbox" data-stt="${sttFormatted}" data-name="${item.name}" data-dob="${item.dob}" data-gender="${item.gender}"></td>
                         <td style="text-align: center; font-weight: bold;">${sttFormatted}</td>
                         <td style="text-align: center;">${item.cccd}</td>
                         <td>${item.name}</td>
-                        <td style="text-align: center;">${item.year}</td>
+                        <td style="text-align: center;">${item.dob}</td>
                         <td style="text-align: center;">${item.gender}</td>
                         <td>${item.address}</td>
                         <td style="text-align: center;">
-                            <button class="btn-print" onclick="printSingleSTT('${sttFormatted}', '${item.name}', '${item.year}', '${item.gender}')">In Tem</button>
+                            <button class="btn-print" onclick="printSingleSTT('${sttFormatted}', '${item.name}', '${item.dob}', '${item.gender}')">In Tem</button>
                         </td>
                     </tr>`;
                     tableBody.insertAdjacentHTML('beforeend', row);
@@ -70,16 +70,21 @@
                 if (data.length >= 6) {
                     let cccd = data[0];
                     let name = data[2];
-                    let dobRaw = data[3];
-                    let yearOfBirth = dobRaw.length === 8 ? dobRaw.substring(4, 8) : dobRaw;
+                    let dobRaw = data[3]; // Định dạng gốc trên CCCD: DDMMYYYY (ví dụ: 15081995)
+                    
+                    // Chuyển đổi DDMMYYYY thành DD/MM/YYYY
+                    let dobFormatted = dobRaw;
+                    if (dobRaw.length === 8) {
+                        dobFormatted = `${dobRaw.substring(0, 2)}/${dobRaw.substring(2, 4)}/${dobRaw.substring(4, 8)}`;
+                    }
+
                     let gender = data[4];
                     let address = data[5];
 
-                    // Đẩy dữ liệu mới lên Firebase Database (Tất cả các máy khác sẽ nhận được ngay lập tức)
                     push(dbRef, {
                         cccd: cccd,
                         name: name,
-                        year: yearOfBirth,
+                        dob: dobFormatted,
                         gender: gender,
                         address: address,
                         timestamp: Date.now()
@@ -123,7 +128,7 @@
         }
         .number-text { font-size: 55px; font-weight: bold; line-height: 1; }
         .name-text { font-size: 16px; font-weight: bold; margin-top: 4px; max-width: 4.8cm; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-        .info-text { font-size: 14px; margin-top: 2px; }
+        .info-text { font-size: 13px; margin-top: 2px; }
 
         #print-area { display: none; }
         @media print {
@@ -136,11 +141,11 @@
 <body>
 
 <div class="container">
-    <h2>Hệ Thống Quản Lý CCCD Realtime & In Tem</h2>
+    <h2>BỆNH VIỆN ĐA KHOA TÂM TRÍ SÀI GÒN</h2>
 
     <!-- 1. Quét CCCD -->
     <div class="section-box scanner-section">
-        <label style="color: #0056b3; font-weight: bold;">📥 Đặt chuột vào ô này và quét mã QR CCCD:</label>
+        <label style="color: #0056b3; font-weight: bold;">📥 Đặt chuột vào ô này và quét mã QR CCCD => Enter để xác nhận dữ liệu:</label>
         <input type="text" id="cccdInput" placeholder="Quét mã QR CCCD..." autofocus autocomplete="off">
     </div>
 
@@ -163,7 +168,7 @@
                     <th>STT</th>
                     <th>Số CCCD</th>
                     <th>Họ và Tên</th>
-                    <th>Năm Sinh</th>
+                    <th>Ngày Sinh</th>
                     <th>Giới Tính</th>
                     <th>Địa Chỉ</th>
                     <th>Thao Tác</th>
@@ -186,14 +191,14 @@
         checkboxes.forEach(cb => cb.checked = source.checked);
     }
 
-    // In 1 tem đơn lẻ
-    function printSingleSTT(sttStr, name, year, gender) {
+    // In 1 tem đơn lẻ (Hiển thị đầy đủ Ngày sinh & Giới tính)
+    function printSingleSTT(sttStr, name, dob, gender) {
         const container = document.getElementById('print-area');
         container.innerHTML = `
             <div class="number-container">
                 <span class="number-text">${sttStr}</span>
                 <span class="name-text">${name}</span>
-                <span class="info-text">NS: ${year} | GT: ${gender}</span>
+                <span class="info-text">NS: ${dob} | GT: ${gender}</span>
             </div>
         `;
         window.print();
@@ -213,14 +218,14 @@
         selectedCheckboxes.forEach(cb => {
             let stt = cb.getAttribute('data-stt');
             let name = cb.getAttribute('data-name');
-            let year = cb.getAttribute('data-year');
+            let dob = cb.getAttribute('data-dob');
             let gender = cb.getAttribute('data-gender');
 
             htmlContent += `
                 <div class="number-container">
                     <span class="number-text">${stt}</span>
                     <span class="name-text">${name}</span>
-                    <span class="info-text">NS: ${year} | GT: ${gender}</span>
+                    <span class="info-text">NS: ${dob} | GT: ${gender}</span>
                 </div>
             `;
         });
@@ -229,19 +234,31 @@
         window.print();
     }
 
-    // Xuất toàn bộ lưới ra Excel
+    // Xuất toàn bộ lưới ra Excel (Ép cột Số CCCD thành kiểu chuỗi Text chống mất số 0)
     function exportExcel() {
         var table = document.getElementById("dataTable");
         if (table.rows.length <= 1) {
             alert("Chưa có dữ liệu để xuất Excel!");
             return;
         }
+        
         let cloneTable = table.cloneNode(true);
         for (let row of cloneTable.rows) {
             row.deleteCell(7); // Xóa cột Thao tác
             row.deleteCell(0); // Xóa cột Checkbox
         }
+
         var wb = XLSX.utils.table_to_book(cloneTable, {sheet: "DanhSachCCCD"});
+        var wsName = wb.SheetNames[0];
+        var ws = wb.Sheets[wsName];
+        
+        for (let cellKey in ws) {
+            if (cellKey[0] === 'C' && cellKey !== 'C1') {
+                ws[cellKey].t = 's';
+                ws[cellKey].z = '@';
+            }
+        }
+
         XLSX.writeFile(wb, 'Danh_Sach_CCCD_Realtime.xlsx');
     }
 </script>
