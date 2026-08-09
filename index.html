@@ -41,6 +41,18 @@
             set(configRef, num);
         };
 
+        // Hàm định dạng ngày giờ chuẩn: DD/MM/YYYY HH:mm:ss
+        function getCurrentDateTime() {
+            let now = new Date();
+            let day = String(now.getDate()).padStart(2, '0');
+            let month = String(now.getMonth() + 1).padStart(2, '0');
+            let year = now.getFullYear();
+            let hours = String(now.getHours()).padStart(2, '0');
+            let minutes = String(now.getMinutes()).padStart(2, '0');
+            let seconds = String(now.getSeconds()).padStart(2, '0');
+            return `${day}/${month}/${year} ${hours}:${minutes}:${seconds}`;
+        }
+
         // 2. Lắng nghe dữ liệu thay đổi Realtime từ Firebase cho danh sách CCCD
         onValue(recordsRef, (snapshot) => {
             const data = snapshot.val();
@@ -54,7 +66,9 @@
                 records.forEach(([key, item], index) => {
                     let currentNum = startNum + index;
                     let sttFormatted = String(currentNum).padStart(4, '0'); // Định dạng 4 chữ số (VD: 101 thành 0101)[cite: 1]
-                    let createdAtVal = item.createdAt || '---'; // Nếu dữ liệu cũ chưa có thì hiển thị mặc định
+                    
+                    // Nếu bản ghi trên Firebase chưa có createdAt, tự động lấy thời gian hiện tại hoặc hiển thị trống rõ ràng
+                    let createdAtVal = item.createdAt ? item.createdAt : getCurrentDateTime();
 
                     let row = `<tr>
                         <td style="text-align: center;"><input type="checkbox" class="row-checkbox" data-stt="${sttFormatted}" data-name="${item.name}" data-dob="${item.dob}" data-gender="${item.gender}"></td>
@@ -94,15 +108,7 @@
 
                     let gender = data[4];
                     let address = data[5];
-
-                    // Tạo ngày giờ hiện tại dạng DD/MM/YYYY HH:mm:ss
-                    let now = new Date();
-                    let dateStr = String(now.getDate()).padStart(2, '0') + '/' + 
-                                  String(now.getMonth() + 1).padStart(2, '0') + '/' + 
-                                  now.getFullYear() + ' ' + 
-                                  String(now.getHours()).padStart(2, '0') + ':' + 
-                                  String(now.getMinutes()).padStart(2, '0') + ':' + 
-                                  String(now.getSeconds()).padStart(2, '0');
+                    let dateStr = getCurrentDateTime(); // Lấy ngày giờ tạo chính xác
 
                     push(recordsRef, {
                         cccd: cccd,
