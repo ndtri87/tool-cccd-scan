@@ -93,7 +93,13 @@
 
             let records = Object.entries(rawRecordsCache);
             
+            // Sắp xếp mặc định ban đầu theo timestamp hoặc customSTT nếu có
             records.sort((a, b) => {
+                let sttA = a[1].customSTT !== undefined ? Number(a[1].customSTT) : 0;
+                let sttB = b[1].customSTT !== undefined ? Number(b[1].customSTT) : 0;
+                if (sttA !== 0 && sttB !== 0 && sttA !== sttB) {
+                    return sttA - sttB;
+                }
                 let timeA = a[1].timestamp || getTimeFromFirebaseId(a[0]);
                 let timeB = b[1].timestamp || getTimeFromFirebaseId(b[0]);
                 return timeA - timeB;
@@ -102,14 +108,15 @@
             let startNum = parseInt(document.getElementById('startNum').value) || 1;
 
             let formattedRecords = records.map(([key, item], index) => {
-                let currentNum = startNum + index;
+                // Nếu bản ghi có sẵn customSTT từ file Excel import vào thì dùng, không thì tự phát sinh theo thứ tự
+                let assignedNum = (item.customSTT !== undefined && item.customSTT !== '') ? Number(item.customSTT) : (startNum + index);
                 let exactTime = item.timestamp || getTimeFromFirebaseId(key);
                 let timeVal = formatTimestamp(exactTime);
 
                 return {
                     key: key,
-                    sttNum: currentNum,
-                    sttFormatted: String(currentNum).padStart(4, '0'),
+                    sttNum: assignedNum,
+                    sttFormatted: String(assignedNum).padStart(4, '0'),
                     cccd: item.cccd || '',
                     name: item.name || '',
                     dob: item.dob || '',
@@ -119,6 +126,7 @@
                 };
             });
 
+            // Sắp xếp theo chiều đang chọn trên tiêu đề STT (asc hoặc desc)
             if (currentSortOrder === 'asc') {
                 formattedRecords.sort((a, b) => a.sttNum - b.sttNum);
             } else {
@@ -214,7 +222,7 @@
                 alert("Đã thêm mới thành công!");
             });
 
-            // 5. Xử lý Import File Excel
+            // 5. Xử lý Import File Excel (Đọc luôn cả STT nếu có)
             const excelFileInput = document.getElementById('excelFileInput');
             excelFileInput.addEventListener('change', function(e) {
                 let file = e.target.files[0];
@@ -228,7 +236,6 @@
                         let firstSheetName = workbook.SheetNames[0];
                         let worksheet = workbook.Sheets[firstSheetName];
                         
-                        // Chuyển sheet thành dạng mảng JSON (lấy từ dòng tiêu đề)
                         let jsonRows = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
 
                         if (jsonRows.length === 0) {
@@ -240,7 +247,7 @@
                         let baseTime = Date.now();
 
                         jsonRows.forEach((row, idx) => {
-                            // Hỗ trợ đọc các tên cột linh hoạt từ file excel người dùng upload
+                            let customSTT = row['STT'] || row['SoThuTu'] || row['Số Thứ Tự'] || '';
                             let cccd = String(row['Số CCCD'] || row['CCCD'] || row['SoCCCD'] || '');
                             let name = String(row['Họ và Tên'] || row['Ho va Ten'] || row['Ten'] || row['Name'] || '');
                             let dob = String(row['Ngày Sinh'] || row['Ngay Sinh'] || row['DOB'] || '');
@@ -248,9 +255,8 @@
                             let address = String(row['Địa Chỉ'] || row['Dia Chi'] || row['Address'] || '');
 
                             if (name) {
-                                // Tăng nhẹ timestamp theo từng dòng để giữ nguyên thứ tự sắp xếp khi import hàng loạt
                                 let itemTime = baseTime + (idx * 10);
-                                push(recordsRef, {
+                                let recordData = {
                                     cccd: cccd,
                                     name: name,
                                     dob: dob,
@@ -258,17 +264,23 @@
                                     address: address,
                                     createdAt: formatTimestamp(itemTime),
                                     timestamp: itemTime
-                                });
+                                };
+
+                                // Nếu dòng Excel có điền STT thì lưu lại
+                                if (customSTT !== '') {
+                                    recordData.customSTT = customSTT;
+                                }
+
+                                push(recordsRef, recordData);
                                 count++;
                             }
                         });
 
-                        alert(`Import thành công ${count} bản ghi lên hệ thống Realtime!`);
+                        alert(`Import thành công ${count} bản ghi lên hệ thống Realtime![cite: 1]`);
                     } catch (err) {
                         console.error(err);
                         alert("Lỗi đọc file Excel! Vui lòng kiểm tra lại cấu trúc tệp.");
                     }
-                    // Reset input file để có thể chọn lại cùng một file nếu cần
                     excelFileInput.value = '';
                 };
                 reader.readAsArrayBuffer(file);
@@ -327,7 +339,7 @@
 
     <!-- Cài đặt số STT bắt đầu -->
     <div class="section-box" style="background: #fff3cd; border-color: #ffeeba;">
-        <label style="font-weight: bold; color: #856404;">⚙️ Cấu hình số STT bắt đầu:</label>
+        <label style="font-weight: bold; color: #856404;">⚙️ Cấu hình số STT bắt đầu (áp dụng khi tự phát sinh):</label>
         <input type="number" id="startNum" value="101" min="1" oninput="updateStartNum(this.value)" style="font-weight: bold; text-align: center; margin-top: 5px;">
     </div>
 
@@ -341,7 +353,7 @@
             <div class="section-box import-section" style="margin-top: 15px; margin-bottom: 0;">
                 <label style="color: #826b00; font-weight: bold;">📂 Import danh sách từ File Excel:</label>
                 <input type="file" id="excelFileInput" accept=".xlsx, .xls, .csv">
-                <span style="font-size: 12px; color: #666; display: block; margin-top: 3px;">(File Excel cần có các cột: Số CCCD, Họ và Tên, Ngày Sinh, Giới Tính, Địa Chỉ)</span>
+                <span style="font-size: 12px; color: #666; display: block; margin-top: 3px;">(Hỗ trợ các cột: STT, Số CCCD, Họ và Tên, Ngày Sinh, Giới Tính, Địa Chỉ)</span>
             </div>
         </div>
 
