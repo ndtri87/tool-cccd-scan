@@ -41,7 +41,7 @@
             set(configRef, num);
         };
 
-        // Hàm định dạng ngày giờ chuẩn: DD/MM/YYYY HH:mm:ss
+        // Hàm lấy ngày giờ định dạng: DD/MM/YYYY HH:mm:ss
         function getCurrentDateTime() {
             let now = new Date();
             let day = String(now.getDate()).padStart(2, '0');
@@ -53,7 +53,7 @@
             return `${day}/${month}/${year} ${hours}:${minutes}:${seconds}`;
         }
 
-        // 2. Lắng nghe dữ liệu thay đổi Realtime từ Firebase cho danh sách CCCD
+        // 2. Lắng nghe dữ liệu thay đổi Realtime từ Firebase, Sắp xếp theo thời gian tạo (timestamp) tăng dần
         onValue(recordsRef, (snapshot) => {
             const data = snapshot.val();
             const tableBody = document.getElementById('tableBody');
@@ -61,13 +61,17 @@
             
             if (data) {
                 let records = Object.entries(data);
+                
+                // Sort theo timestamp tăng dần để đảm bảo thứ tự quét trước lên trước, quét sau xuống sau
+                records.sort((a, b) => (a[1].timestamp || 0) - (b[1].timestamp || 0));
+
                 let startNum = parseInt(document.getElementById('startNum').value) || 1;
 
                 records.forEach(([key, item], index) => {
                     let currentNum = startNum + index;
-                    let sttFormatted = String(currentNum).padStart(4, '0'); // Định dạng 4 chữ số (VD: 101 thành 0101)[cite: 1]
+                    let sttFormatted = String(currentNum).padStart(4, '0'); // Định dạng 4 chữ số (VD: 0101, 0102...)[cite: 1]
                     
-                    // Nếu bản ghi trên Firebase chưa có createdAt, tự động lấy thời gian hiện tại hoặc hiển thị trống rõ ràng
+                    // Nếu bản ghi cũ chưa có createdAt, lấy timestamp hoặc giờ hiện tại gán vào để không bị trống
                     let createdAtVal = item.createdAt ? item.createdAt : getCurrentDateTime();
 
                     let row = `<tr>
@@ -108,7 +112,7 @@
 
                     let gender = data[4];
                     let address = data[5];
-                    let dateStr = getCurrentDateTime(); // Lấy ngày giờ tạo chính xác
+                    let dateStr = getCurrentDateTime();
 
                     push(recordsRef, {
                         cccd: cccd,
@@ -117,7 +121,7 @@
                         gender: gender,
                         address: address,
                         createdAt: dateStr,
-                        timestamp: Date.now()
+                        timestamp: Date.now() // Lưu mốc thời gian chính xác để sort chuẩn xác
                     });
 
                 } else {
