@@ -26,8 +26,9 @@
         const db = getDatabase(app);
         const recordsRef = ref(db, 'cccd_records');
         const configRef = ref(db, 'config/startNum');
+        const sortRef = ref(db, 'config/sortOrder');
 
-        // 1. Đồng bộ và lắng nghe số STT bắt đầu từ Firebase realtime
+        // 1. Đồng bộ cấu hình từ Firebase realtime
         onValue(configRef, (snapshot) => {
             const val = snapshot.val();
             if (val !== null) {
@@ -35,10 +36,22 @@
             }
         });
 
-        // Hàm cập nhật số bắt đầu lên Firebase khi người dùng thay đổi
+        onValue(sortRef, (snapshot) => {
+            const val = snapshot.val();
+            if (val !== null) {
+                document.getElementById('sortOrder').value = val;
+            }
+        });
+
+        // Hàm cập nhật số bắt đầu lên Firebase
         window.updateStartNum = function(newVal) {
             let num = parseInt(newVal) || 1;
             set(configRef, num);
+        };
+
+        // Hàm cập nhật chiều sắp xếp lên Firebase
+        window.updateSortOrder = function(newVal) {
+            set(sortRef, newVal);
         };
 
         // Hàm lấy ngày giờ định dạng: DD/MM/YYYY HH:mm:ss
@@ -53,7 +66,7 @@
             return `${day}/${month}/${year} ${hours}:${minutes}:${seconds}`;
         }
 
-        // 2. Lắng nghe dữ liệu thay đổi Realtime từ Firebase, Sắp xếp theo thời gian tạo (timestamp) tăng dần
+        // 2. Lắng nghe dữ liệu thay đổi Realtime từ Firebase và hiển thị theo tùy chọn sắp xếp
         onValue(recordsRef, (snapshot) => {
             const data = snapshot.val();
             const tableBody = document.getElementById('tableBody');
@@ -62,29 +75,47 @@
             if (data) {
                 let records = Object.entries(data);
                 
-                // Sort theo timestamp tăng dần để đảm bảo thứ tự quét trước lên trước, quét sau xuống sau
+                // Sắp xếp mặc định theo timestamp tăng dần trước
                 records.sort((a, b) => (a[1].timestamp || 0) - (b[1].timestamp || 0));
 
                 let startNum = parseInt(document.getElementById('startNum').value) || 1;
+                let sortOrder = document.getElementById('sortOrder').value; // 'asc' hoặc 'desc'
 
-                records.forEach(([key, item], index) => {
+                let formattedRecords = records.map(([key, item], index) => {
                     let currentNum = startNum + index;
-                    let sttFormatted = String(currentNum).padStart(4, '0'); // Định dạng 4 chữ số (VD: 0101, 0102...)[cite: 1]
-                    
-                    // Nếu bản ghi cũ chưa có createdAt, lấy timestamp hoặc giờ hiện tại gán vào để không bị trống
-                    let createdAtVal = item.createdAt ? item.createdAt : getCurrentDateTime();
+                    return {
+                        key: key,
+                        sttNum: currentNum,
+                        sttFormatted: String(currentNum).padStart(4, '0'),
+                        cccd: item.cccd,
+                        name: item.name,
+                        dob: item.dob,
+                        gender: item.gender,
+                        address: item.address,
+                        createdAt: item.createdAt ? item.createdAt : getCurrentDateTime()
+                    };
+                });
 
+                // Sắp xếp theo STT: Nhỏ đến lớn (asc) hoặc Lớn đến nhỏ (desc)
+                if (sortOrder === 'asc') {
+                    formattedRecords.sort((a, b) => a.sttNum - b.sttNum);
+                } else {
+                    formattedRecords.sort((a, b) => b.sttNum - a.sttNum);
+                }
+
+                // Render ra bảng lưới
+                formattedRecords.forEach((item) => {
                     let row = `<tr>
-                        <td style="text-align: center;"><input type="checkbox" class="row-checkbox" data-stt="${sttFormatted}" data-name="${item.name}" data-dob="${item.dob}" data-gender="${item.gender}"></td>
-                        <td style="text-align: center; font-weight: bold;">${sttFormatted}</td>
+                        <td style="text-align: center;"><input type="checkbox" class="row-checkbox" data-stt="${item.sttFormatted}" data-name="${item.name}" data-dob="${item.dob}" data-gender="${item.gender}"></td>
+                        <td style="text-align: center; font-weight: bold;">${item.sttFormatted}</td>
                         <td style="text-align: center;">${item.cccd}</td>
                         <td>${item.name}</td>
                         <td style="text-align: center;">${item.dob}</td>
                         <td style="text-align: center;">${item.gender}</td>
                         <td>${item.address}</td>
-                        <td style="text-align: center;">${createdAtVal}</td>
+                        <td style="text-align: center;">${item.createdAt}</td>
                         <td style="text-align: center;">
-                            <button class="btn-print" onclick="printSingleSTT('${sttFormatted}', '${item.name}', '${item.dob}', '${item.gender}')">In Tem</button>
+                            <button class="btn-print" onclick="printSingleSTT('${item.sttFormatted}', '${item.name}', '${item.dob}', '${item.gender}')">In Tem</button>
                         </td>
                     </tr>`;
                     tableBody.insertAdjacentHTML('beforeend', row);
@@ -121,7 +152,7 @@
                         gender: gender,
                         address: address,
                         createdAt: dateStr,
-                        timestamp: Date.now() // Lưu mốc thời gian chính xác để sort chuẩn xác
+                        timestamp: Date.now()
                     });
 
                 } else {
@@ -138,7 +169,7 @@
         .container { max-width: 1100px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
         .section-box { border: 1px solid #ddd; padding: 15px; margin-bottom: 20px; border-radius: 6px; background: #fff; }
         .scanner-section { background: #e8f4fd; border: 2px dashed #007bff; }
-        input[type="text"], input[type="number"] { width: 100%; padding: 8px; margin: 5px 0; box-sizing: border-box; }
+        input[type="text"], input[type="number"], select { width: 100%; padding: 8px; margin: 5px 0; box-sizing: border-box; }
         button { padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; color: white; font-weight: bold; }
         .btn-excel { background: #17a2b8; }
         .btn-print { background: #28a745; padding: 5px 10px; font-size: 12px; }
@@ -177,13 +208,18 @@
 <div class="container">
     <h2>BỆNH VIỆN ĐA KHOA TÂM TRÍ SÀI GÒN</h2>
 
-    <!-- Cài đặt số STT bắt đầu -->
-    <div class="section-box" style="background: #fff3cd; border-color: #ffeeba;">
-        <label style="font-weight: bold; color: #856404;">⚙️ Cấu hình số thứ tự bắt đầu:</label>
-        <div style="display: flex; align-items: center; gap: 10px; margin-top: 5px;">
-            <span>Nhập số bắt đầu (VD: 101):</span>
-            <input type="number" id="startNum" value="101" min="1" oninput="updateStartNum(this.value)" style="width: 120px; font-weight: bold; text-align: center;">
-            <span style="font-size: 13px; color: #666;">(Hệ thống tự động thêm số 0 ở đầu thành 4 chữ số: 0101, 0102...)[cite: 1]</span>
+    <!-- Cài đặt số STT bắt đầu & Tùy chọn sắp xếp -->
+    <div class="section-box" style="background: #fff3cd; border-color: #ffeeba; display: flex; gap: 20px;">
+        <div style="flex: 1;">
+            <label style="font-weight: bold; color: #856404;">⚙️ Cấu hình số STT bắt đầu:</label>
+            <input type="number" id="startNum" value="101" min="1" oninput="updateStartNum(this.value)" style="font-weight: bold; text-align: center;">
+        </div>
+        <div style="flex: 1;">
+            <label style="font-weight: bold; color: #856404;">🔄 Tùy chọn sắp xếp STT:</label>
+            <select id="sortOrder" onchange="updateSortOrder(this.value)" style="font-weight: bold;">
+                <option value="asc">Nhỏ đến lớn (Tăng dần)</option>
+                <option value="desc">Lớn đến nhỏ (Giảm dần)</option>
+            </select>
         </div>
     </div>
 
