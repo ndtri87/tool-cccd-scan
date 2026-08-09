@@ -54,6 +54,7 @@
                 records.forEach(([key, item], index) => {
                     let currentNum = startNum + index;
                     let sttFormatted = String(currentNum).padStart(4, '0'); // Định dạng 4 chữ số (VD: 101 thành 0101)[cite: 1]
+                    let createdAtVal = item.createdAt || '---'; // Nếu dữ liệu cũ chưa có thì hiển thị mặc định
 
                     let row = `<tr>
                         <td style="text-align: center;"><input type="checkbox" class="row-checkbox" data-stt="${sttFormatted}" data-name="${item.name}" data-dob="${item.dob}" data-gender="${item.gender}"></td>
@@ -63,7 +64,7 @@
                         <td style="text-align: center;">${item.dob}</td>
                         <td style="text-align: center;">${item.gender}</td>
                         <td>${item.address}</td>
-                        <td style="text-align: center;">${item.createdAt || ''}</td>
+                        <td style="text-align: center;">${createdAtVal}</td>
                         <td style="text-align: center;">
                             <button class="btn-print" onclick="printSingleSTT('${sttFormatted}', '${item.name}', '${item.dob}', '${item.gender}')">In Tem</button>
                         </td>
@@ -278,7 +279,7 @@
         
         let cloneTable = table.cloneNode(true);
         for (let row of cloneTable.rows) {
-            row.deleteCell(8); // Xóa cột Thao tác (chỉ mục mới sau khi thêm cột Ngày Tạo)
+            row.deleteCell(8); // Xóa cột Thao tác
             row.deleteCell(0); // Xóa cột Checkbox
         }
 
