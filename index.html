@@ -8,7 +8,7 @@
     <!-- Thư viện Firebase v10 (Modular SDK) -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getDatabase, ref, push, set, onValue, get } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+        import { getDatabase, ref, push, set, onValue } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
         // === THAY THẾ CONFIG FIREBASE CỦA BẠN VÀO ĐÂY ===
         const firebaseConfig = {
@@ -28,19 +28,25 @@
         const configRef = ref(db, 'config/startNum');
         const sortRef = ref(db, 'config/sortOrder');
 
-        // 1. Đồng bộ cấu hình từ Firebase realtime
+        // Lưu trữ dữ liệu thô từ Firebase để tiện sắp xếp lại ngay khi thay đổi giao diện
+        let rawRecordsCache = null;
+
+        // 1. Đồng bộ số STT bắt đầu từ Firebase realtime
         onValue(configRef, (snapshot) => {
             const val = snapshot.val();
             if (val !== null) {
                 document.getElementById('startNum').value = val;
             }
+            renderTable();
         });
 
+        // Đồng bộ tùy chọn sắp xếp từ Firebase realtime
         onValue(sortRef, (snapshot) => {
             const val = snapshot.val();
             if (val !== null) {
                 document.getElementById('sortOrder').value = val;
             }
+            renderTable();
         });
 
         // Hàm cập nhật số bắt đầu lên Firebase
@@ -49,9 +55,10 @@
             set(configRef, num);
         };
 
-        // Hàm cập nhật chiều sắp xếp lên Firebase
+        // Hàm cập nhật chiều sắp xếp lên Firebase và render lại ngay lập tức
         window.updateSortOrder = function(newVal) {
             set(sortRef, newVal);
+            renderTable();
         };
 
         // Hàm lấy ngày giờ định dạng: DD/MM/YYYY HH:mm:ss
@@ -66,100 +73,108 @@
             return `${day}/${month}/${year} ${hours}:${minutes}:${seconds}`;
         }
 
-        // 2. Lắng nghe dữ liệu thay đổi Realtime từ Firebase và hiển thị theo tùy chọn sắp xếp
+        // 2. Lắng nghe dữ liệu thay đổi Realtime từ Firebase
         onValue(recordsRef, (snapshot) => {
             const data = snapshot.val();
+            rawRecordsCache = data;
+            renderTable();
+        });
+
+        // Hàm vẽ lại bảng lưới dựa trên dữ liệu cache, số bắt đầu và kiểu sắp xếp
+        function renderTable() {
             const tableBody = document.getElementById('tableBody');
             tableBody.innerHTML = '';
             
-            if (data) {
-                let records = Object.entries(data);
-                
-                // Sắp xếp mặc định theo timestamp tăng dần trước
-                records.sort((a, b) => (a[1].timestamp || 0) - (b[1].timestamp || 0));
+            if (!rawRecordsCache) return;
 
-                let startNum = parseInt(document.getElementById('startNum').value) || 1;
-                let sortOrder = document.getElementById('sortOrder').value; // 'asc' hoặc 'desc'
+            let records = Object.entries(rawRecordsCache);
+            
+            // Sắp xếp mặc định theo timestamp tăng dần trước để tính STT đúng vị trí quét
+            records.sort((a, b) => (a[1].timestamp || 0) - (b[1].timestamp || 0));
 
-                let formattedRecords = records.map(([key, item], index) => {
-                    let currentNum = startNum + index;
-                    return {
-                        key: key,
-                        sttNum: currentNum,
-                        sttFormatted: String(currentNum).padStart(4, '0'),
-                        cccd: item.cccd,
-                        name: item.name,
-                        dob: item.dob,
-                        gender: item.gender,
-                        address: item.address,
-                        createdAt: item.createdAt ? item.createdAt : getCurrentDateTime()
-                    };
-                });
+            let startNum = parseInt(document.getElementById('startNum').value) || 1;
+            let sortOrder = document.getElementById('sortOrder').value; // 'asc' hoặc 'desc'
 
-                // Sắp xếp theo STT: Nhỏ đến lớn (asc) hoặc Lớn đến nhỏ (desc)
-                if (sortOrder === 'asc') {
-                    formattedRecords.sort((a, b) => a.sttNum - b.sttNum);
-                } else {
-                    formattedRecords.sort((a, b) => b.sttNum - a.sttNum);
-                }
+            let formattedRecords = records.map(([key, item], index) => {
+                let currentNum = startNum + index;
+                return {
+                    key: key,
+                    sttNum: currentNum,
+                    sttFormatted: String(currentNum).padStart(4, '0'),
+                    cccd: item.cccd,
+                    name: item.name,
+                    dob: item.dob,
+                    gender: item.gender,
+                    address: item.address,
+                    createdAt: item.createdAt ? item.createdAt : getCurrentDateTime()
+                };
+            });
 
-                // Render ra bảng lưới
-                formattedRecords.forEach((item) => {
-                    let row = `<tr>
-                        <td style="text-align: center;"><input type="checkbox" class="row-checkbox" data-stt="${item.sttFormatted}" data-name="${item.name}" data-dob="${item.dob}" data-gender="${item.gender}"></td>
-                        <td style="text-align: center; font-weight: bold;">${item.sttFormatted}</td>
-                        <td style="text-align: center;">${item.cccd}</td>
-                        <td>${item.name}</td>
-                        <td style="text-align: center;">${item.dob}</td>
-                        <td style="text-align: center;">${item.gender}</td>
-                        <td>${item.address}</td>
-                        <td style="text-align: center;">${item.createdAt}</td>
-                        <td style="text-align: center;">
-                            <button class="btn-print" onclick="printSingleSTT('${item.sttFormatted}', '${item.name}', '${item.dob}', '${item.gender}')">In Tem</button>
-                        </td>
-                    </tr>`;
-                    tableBody.insertAdjacentHTML('beforeend', row);
-                });
+            // Sắp xếp theo lựa chọn của người dùng: Nhỏ đến lớn (asc) hoặc Lớn đến nhỏ (desc)
+            if (sortOrder === 'asc') {
+                formattedRecords.sort((a, b) => a.sttNum - b.sttNum);
+            } else {
+                formattedRecords.sort((a, b) => b.sttNum - a.sttNum);
             }
-        });
+
+            // Render ra bảng lưới HTML
+            formattedRecords.forEach((item) => {
+                let row = `<tr>
+                    <td style="text-align: center;"><input type="checkbox" class="row-checkbox" data-stt="${item.sttFormatted}" data-name="${item.name}" data-dob="${item.dob}" data-gender="${item.gender}"></td>
+                    <td style="text-align: center; font-weight: bold;">${item.sttFormatted}</td>
+                    <td style="text-align: center;">${item.cccd}</td>
+                    <td>${item.name}</td>
+                    <td style="text-align: center;">${item.dob}</td>
+                    <td style="text-align: center;">${item.gender}</td>
+                    <td>${item.address}</td>
+                    <td style="text-align: center;">${item.createdAt}</td>
+                    <td style="text-align: center;">
+                        <button class="btn-print" onclick="printSingleSTT('${item.sttFormatted}', '${item.name}', '${item.dob}', '${item.gender}')">In Tem</button>
+                    </td>
+                </tr>`;
+                tableBody.insertAdjacentHTML('beforeend', row);
+            });
+        }
 
         // 3. Xử lý khi quét mã QR CCCD và đẩy lên Firebase
-        const cccdInput = document.getElementById('cccdInput');
-        cccdInput.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                let rawData = this.value.trim();
-                let data = rawData.split('|');
+        window.addEventListener('DOMContentLoaded', () => {
+            const cccdInput = document.getElementById('cccdInput');
+            cccdInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    let rawData = this.value.trim();
+                    let data = rawData.split('|');
 
-                if (data.length >= 6) {
-                    let cccd = data[0];
-                    let name = data[2];
-                    let dobRaw = data[3]; // Định dạng gốc trên CCCD: DDMMYYYY
-                    
-                    let dobFormatted = dobRaw;
-                    if (dobRaw.length === 8) {
-                        dobFormatted = `${dobRaw.substring(0, 2)}/${dobRaw.substring(2, 4)}/${dobRaw.substring(4, 8)}`;
+                    if (data.length >= 6) {
+                        let cccd = data[0];
+                        let name = data[2];
+                        let dobRaw = data[3]; // Định dạng gốc trên CCCD: DDMMYYYY
+                        
+                        let dobFormatted = dobRaw;
+                        if (dobRaw.length === 8) {
+                            dobFormatted = `${dobRaw.substring(0, 2)}/${dobRaw.substring(2, 4)}/${dobRaw.substring(4, 8)}`;
+                        }
+
+                        let gender = data[4];
+                        let address = data[5];
+                        let dateStr = getCurrentDateTime();
+
+                        push(recordsRef, {
+                            cccd: cccd,
+                            name: name,
+                            dob: dobFormatted,
+                            gender: gender,
+                            address: address,
+                            createdAt: dateStr,
+                            timestamp: Date.now()
+                        });
+
+                    } else {
+                        alert("Dữ liệu quét không phải mã QR CCCD hợp lệ!");
                     }
-
-                    let gender = data[4];
-                    let address = data[5];
-                    let dateStr = getCurrentDateTime();
-
-                    push(recordsRef, {
-                        cccd: cccd,
-                        name: name,
-                        dob: dobFormatted,
-                        gender: gender,
-                        address: address,
-                        createdAt: dateStr,
-                        timestamp: Date.now()
-                    });
-
-                } else {
-                    alert("Dữ liệu quét không phải mã QR CCCD hợp lệ!");
+                    this.value = '';
                 }
-                this.value = '';
-            }
+            });
         });
     </script>
 
