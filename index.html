@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <title>TTSG</title>
+    <title>TMMC Healthcare</title>
     <!-- Thư viện xuất Excel -->
     <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
     <!-- Thư viện Firebase v10 (Modular SDK) -->
@@ -49,12 +49,11 @@
             
             if (data) {
                 let records = Object.entries(data);
-                // Lấy số bắt đầu trực tiếp từ ô input trên giao diện
                 let startNum = parseInt(document.getElementById('startNum').value) || 1;
 
                 records.forEach(([key, item], index) => {
                     let currentNum = startNum + index;
-                    let sttFormatted = String(currentNum).padStart(4, '0'); // Định dạng 4 chữ số
+                    let sttFormatted = String(currentNum).padStart(4, '0'); // Định dạng 4 chữ số (VD: 101 thành 0101)[cite: 1]
 
                     let row = `<tr>
                         <td style="text-align: center;"><input type="checkbox" class="row-checkbox" data-stt="${sttFormatted}" data-name="${item.name}" data-dob="${item.dob}" data-gender="${item.gender}"></td>
@@ -156,13 +155,13 @@
 <div class="container">
     <h2>BỆNH VIỆN ĐA KHOA TÂM TRÍ SÀI GÒN</h2>
 
-    <!-- Cài đặt số STT bắt đầu (Đồng bộ Realtime) -->
+    <!-- Cài đặt số STT bắt đầu (Nhập 101 để ra 0101) -->
     <div class="section-box" style="background: #fff3cd; border-color: #ffeeba;">
-        <label style="font-weight: bold; color: #856404;">⚙️ Cấu hình số thứ tự phát sinh (Đồng bộ toàn hệ thống):</label>
+        <label style="font-weight: bold; color: #856404;">⚙️ Cấu hình số thứ tự bắt đầu:</label>
         <div style="display: flex; align-items: center; gap: 10px; margin-top: 5px;">
-            <span>STT Bắt Đầu:</span>
-            <input type="number" id="startNum" value="1" min="1" oninput="updateStartNum(this.value)" style="width: 120px; font-weight: bold; text-align: center;">
-            <span style="font-size: 13px; color: #666;">(Thay đổi tại đây sẽ tự động cập nhật STT cho tất cả các máy)[cite: 1]</span>
+            <span>Nhập số bắt đầu (VD: 101):</span>
+            <input type="number" id="startNum" value="101" min="1" oninput="updateStartNum(this.value)" style="width: 120px; font-weight: bold; text-align: center;">
+            <span style="font-size: 13px; color: #666;">(Hệ thống tự động thêm số 0 ở đầu thành 4 chữ số: 0101, 0102...)[cite: 1]</span>
         </div>
     </div>
 
