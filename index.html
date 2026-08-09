@@ -2,13 +2,13 @@
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <title>Hệ Thống Quản Lý CCCD Realtime & In Tem</title>
+    <title>TTSG</title>
     <!-- Thư viện xuất Excel -->
     <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
     <!-- Thư viện Firebase v10 (Modular SDK) -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getDatabase, ref, push, set, onValue, remove } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+        import { getDatabase, ref, push, set, onValue, get } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
         // === THAY THẾ CONFIG FIREBASE CỦA BẠN VÀO ĐÂY ===
         const firebaseConfig = {
@@ -24,17 +24,32 @@
         // Khởi tạo Firebase
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
-        const dbRef = ref(db, 'cccd_records');
+        const recordsRef = ref(db, 'cccd_records');
+        const configRef = ref(db, 'config/startNum');
 
-        // 1. Lắng nghe dữ liệu thay đổi Realtime từ Firebase
-        onValue(dbRef, (snapshot) => {
+        // 1. Đồng bộ và lắng nghe số STT bắt đầu từ Firebase realtime
+        onValue(configRef, (snapshot) => {
+            const val = snapshot.val();
+            if (val !== null) {
+                document.getElementById('startNum').value = val;
+            }
+        });
+
+        // Hàm cập nhật số bắt đầu lên Firebase khi người dùng thay đổi
+        window.updateStartNum = function(newVal) {
+            let num = parseInt(newVal) || 1;
+            set(configRef, num);
+        };
+
+        // 2. Lắng nghe dữ liệu thay đổi Realtime từ Firebase cho danh sách CCCD
+        onValue(recordsRef, (snapshot) => {
             const data = snapshot.val();
             const tableBody = document.getElementById('tableBody');
             tableBody.innerHTML = '';
             
             if (data) {
                 let records = Object.entries(data);
-                // Lấy số bắt đầu do người dùng nhập trên giao diện (mặc định là 1 nếu trống)
+                // Lấy số bắt đầu trực tiếp từ ô input trên giao diện
                 let startNum = parseInt(document.getElementById('startNum').value) || 1;
 
                 records.forEach(([key, item], index) => {
@@ -58,7 +73,7 @@
             }
         });
 
-        // 2. Xử lý khi quét mã QR CCCD và đẩy lên Firebase
+        // 3. Xử lý khi quét mã QR CCCD và đẩy lên Firebase
         const cccdInput = document.getElementById('cccdInput');
         cccdInput.addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
@@ -79,7 +94,7 @@
                     let gender = data[4];
                     let address = data[5];
 
-                    push(dbRef, {
+                    push(recordsRef, {
                         cccd: cccd,
                         name: name,
                         dob: dobFormatted,
@@ -139,15 +154,15 @@
 <body>
 
 <div class="container">
-    <h2>Hệ Thống Quản Lý CCCD Realtime & In Tem</h2>
+    <h2>BỆNH VIỆN ĐA KHOA TÂM TRÍ SÀI GÒN</h2>
 
-    <!-- Cài đặt số STT bắt đầu -->
+    <!-- Cài đặt số STT bắt đầu (Đồng bộ Realtime) -->
     <div class="section-box" style="background: #fff3cd; border-color: #ffeeba;">
-        <label style="font-weight: bold; color: #856404;">⚙️ Cấu hình số thứ tự phát sinh:</label>
+        <label style="font-weight: bold; color: #856404;">⚙️ Cấu hình số thứ tự phát sinh (Đồng bộ toàn hệ thống):</label>
         <div style="display: flex; align-items: center; gap: 10px; margin-top: 5px;">
             <span>STT Bắt Đầu:</span>
-            <input type="number" id="startNum" value="1" min="1" onchange="location.reload()" style="width: 120px; font-weight: bold; text-align: center;">
-            <span style="font-size: 13px; color: #666;">(Thay đổi số này để đổi mốc STT bắt đầu)</span>
+            <input type="number" id="startNum" value="1" min="1" oninput="updateStartNum(this.value)" style="width: 120px; font-weight: bold; text-align: center;">
+            <span style="font-size: 13px; color: #666;">(Thay đổi tại đây sẽ tự động cập nhật STT cho tất cả các máy)[cite: 1]</span>
         </div>
     </div>
 
