@@ -48,23 +48,21 @@
         // Hàm đổi chiều sắp xếp khi bấm vào tiêu đề STT
         window.toggleSort = function() {
             currentSortOrder = (currentSortOrder === 'asc') ? 'desc' : 'asc';
-            
-            // Đổi ký hiệu mũi tên trên tiêu đề cột STT cho trực quan
             let sortIcon = document.getElementById('sortIcon');
             sortIcon.innerText = (currentSortOrder === 'asc') ? ' 🔼' : ' 🔽';
-            
             renderTable();
         };
 
-        // Hàm lấy ngày giờ định dạng chính xác: DD/MM/YYYY HH:mm:ss
-        function getCurrentDateTime() {
-            let now = new Date();
-            let day = String(now.getDate()).padStart(2, '0');
-            let month = String(now.getMonth() + 1).padStart(2, '0');
-            let year = now.getFullYear();
-            let hours = String(now.getHours()).padStart(2, '0');
-            let minutes = String(now.getMinutes()).padStart(2, '0');
-            let seconds = String(now.getSeconds()).padStart(2, '0');
+        // Hàm chuyển đổi timestamp thành chuỗi ngày giờ chuẩn: DD/MM/YYYY HH:mm:ss
+        function formatTimestamp(ts) {
+            if (!ts) return '---';
+            let date = new Date(ts);
+            let day = String(date.getDate()).padStart(2, '0');
+            let month = String(date.getMonth() + 1).padStart(2, '0');
+            let year = date.getFullYear();
+            let hours = String(date.getHours()).padStart(2, '0');
+            let minutes = String(date.getMinutes()).padStart(2, '0');
+            let seconds = String(date.getSeconds()).padStart(2, '0');
             return `${day}/${month}/${year} ${hours}:${minutes}:${seconds}`;
         }
 
@@ -84,13 +82,16 @@
 
             let records = Object.entries(rawRecordsCache);
             
-            // Sắp xếp theo timestamp tăng dần để cố định vị trí quét ban đầu
+            // Sắp xếp theo timestamp tăng dần để cố định thứ tự quét ban đầu
             records.sort((a, b) => (a[1].timestamp || 0) - (b[1].timestamp || 0));
 
             let startNum = parseInt(document.getElementById('startNum').value) || 1;
 
             let formattedRecords = records.map(([key, item], index) => {
                 let currentNum = startNum + index;
+                // Lấy thời gian chuẩn từ createdAt hoặc dịch từ timestamp riêng biệt của bản ghi
+                let timeVal = item.createdAt ? item.createdAt : formatTimestamp(item.timestamp);
+
                 return {
                     key: key,
                     sttNum: currentNum,
@@ -100,11 +101,11 @@
                     dob: item.dob,
                     gender: item.gender,
                     address: item.address,
-                    createdAt: item.createdAt ? item.createdAt : getCurrentDateTime()
+                    createdAt: timeVal
                 };
             });
 
-            // Sắp xếp theo chiều đang chọn (asc hoặc desc)
+            // Sắp xếp theo chiều đang chọn trên tiêu đề STT (asc hoặc desc)
             if (currentSortOrder === 'asc') {
                 formattedRecords.sort((a, b) => a.sttNum - b.sttNum);
             } else {
@@ -151,7 +152,7 @@
 
                         let gender = data[4];
                         let address = data[5];
-                        let dateStr = getCurrentDateTime(); // Lấy đúng thời gian hiện tại chuẩn xác
+                        let nowMs = Date.now(); // Mốc thời gian thực tế tại thời điểm quét
 
                         push(recordsRef, {
                             cccd: cccd,
@@ -159,8 +160,8 @@
                             dob: dobFormatted,
                             gender: gender,
                             address: address,
-                            createdAt: dateStr,
-                            timestamp: Date.now()
+                            createdAt: formatTimestamp(nowMs),
+                            timestamp: nowMs
                         });
 
                     } else {
